@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Endevina el Barrufet!</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Fredoka per a títols juganers i Inter per a llegibilitat -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Fredoka', 'sans-serif'],
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        smurf: {
+                            light: '#4DB8FF',
+                            DEFAULT: '#0088FF',
+                            dark: '#0062CC',
+                            deep: '#00428A',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Fons alegre estil poblat dels Barrufets */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(180deg, #CBEBFF 0%, #EAF6FF 55%, #E3F6E5 100%);
+            min-height: 100dvh;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        h1, h2, h3, .font-display {
+            font-family: 'Fredoka', sans-serif;
+        }
+
+        /* Botons tàctils amb efecte relleu */
+        .game-btn {
+            transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s ease, background-color 0.16s ease;
+            touch-action: manipulation;
+        }
+        .game-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+        .game-btn:active:not(:disabled) {
+            transform: translateY(1px) scale(0.97);
+        }
+
+        /* Targetes d'opcions de mestres */
+        .teacher-card {
+            transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease, border-color 0.18s ease, opacity 0.25s ease;
+            touch-action: manipulation;
+        }
+        @media (hover: hover) {
+            .teacher-card:hover:not(.locked) {
+                transform: translateY(-3px) scale(1.015);
+                box-shadow: 0 10px 22px -6px rgba(0, 136, 255, 0.28);
+            }
+        }
+        .teacher-card:active:not(.locked) {
+            transform: scale(0.97);
+        }
+
+        /* Animacions d'entrada, error i puntuació */
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.94) translateY(8px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-pop-in {
+            animation: popIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        @keyframes shakeError {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-6px); }
+            40% { transform: translateX(6px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+        .animate-shake {
+            animation: shakeError 0.38s ease-in-out;
+        }
+
+        @keyframes scorePop {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.22); }
+        }
+        .animate-score-pop {
+            animation: scorePop 0.32s ease;
+        }
+
+        @keyframes floatCloud {
+            0%, 100% { transform: translateX(0px); }
+            50% { transform: translateX(12px); }
+        }
+        .cloud-float {
+            animation: floatCloud 10s ease-in-out infinite;
+        }
+        .cloud-float-slow {
+            animation: floatCloud 14s ease-in-out infinite reverse;
+        }
+
+        /* Canvas de confeti */
+        #confettiCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 60;
+            display: none;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-smurf selection:text-white relative">
+
+    <!-- Canvas per al confeti final -->
+    <canvas id="confettiCanvas"></canvas>
+
+    <!-- Decoració subtil de núvols -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
+        <svg class="cloud-float absolute top-4 left-[4%] w-24 sm:w-36 text-white/75" viewBox="0 0 200 90" fill="currentColor">
+            <path d="M40,75 C20,75 8,62 8,47 C8,34 18,23 31,21 C37,9 51,2 66,2 C85,2 101,14 106,30 C111,27 118,25 125,25 C144,25 160,39 162,57 C174,58 184,65 184,75 Z"/>
+        </svg>
+        <svg class="cloud-float-slow absolute top-10 right-[6%] w-28 sm:w-44 text-white/70" viewBox="0 0 200 90" fill="currentColor">
+            <path d="M40,75 C20,75 8,62 8,47 C8,34 18,23 31,21 C37,9 51,2 66,2 C85,2 101,14 106,30 C111,27 118,25 125,25 C144,25 160,39 162,57 C174,58 184,65 184,75 Z"/>
+        </svg>
+    </div>
+
+    <!-- Contenidor Principal -->
+    <div class="relative z-10 min-h-[100dvh] flex flex-col">
+
+        <!-- ========================================================== -->
+        <!-- PANTALLA 1: INICI / DETECCIÓ AUTOMÀTICA DE FOTOS           -->
+        <!-- ========================================================== -->
+        <main id="startScreen" class="flex-1 flex items-center justify-center p-4 sm:p-6">
+            <div class="w-full max-w-lg bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl border-4 border-smurf/20 p-6 sm:p-9 text-center animate-pop-in">
+                
+                <!-- Emblema Barret de Barrufet -->
+                <div class="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-smurf-light to-smurf-dark shadow-lg mb-4 border-4 border-white">
+                    <svg class="w-12 h-12 sm:w-14 sm:h-14" viewBox="0 0 64 64" fill="none">
+                        <path d="M16 46 C14 34 20 16 38 12 C48 10 54 16 50 24 C47 30 39 28 42 35 C45 41 50 43 50 46 C50 51 16 51 16 46 Z" fill="#FFFFFF" stroke="#00428A" stroke-width="2.5" stroke-linejoin="round"/>
+                        <path d="M14 48 C14 44 52 44 52 48 C52 53 14 53 14 48 Z" fill="#E0F2FE" stroke="#00428A" stroke-width="2.5"/>
+                    </svg>
+                </div>
+
+                <h1 class="font-display text-3xl sm:text-5xl font-bold text-smurf-dark tracking-tight">
+                    Endevina el Barrufet!
+                </h1>
+
+                <p class="mt-2.5 text-slate-600 text-sm sm:text-base leading-relaxed">
+                    El claustre de l'escola s'ha transformat en Barrufets! Seràs capaç de reconéixer tots els mestres?
+                </p>
+
+                <!-- Estat 1: Comprovant la carpeta imatges/ -->
+                <div id="checkingState" class="mt-7 py-5">
+                    <div class="inline-block w-9 h-9 border-4 border-smurf/25 border-t-smurf rounded-full animate-spin mb-2"></div>
+                    <p class="text-sm font-medium text-slate-500">Buscant les fotos dels barrufets...</p>
+                </div>
+
+                <!-- Estat 2: Fotos trobades a imatges/ -->
+                <div id="readyState" class="hidden mt-6 space-y-5 animate-pop-in">
+                    <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-50 border border-sky-200 text-smurf-deep font-semibold text-sm">
+                        <span>🍄</span>
+                        <span>34 barrufets preparats per jugar!</span>
+                    </div>
+
+                    <div class="bg-slate-50 rounded-2xl p-4 text-left text-xs sm:text-sm text-slate-600 space-y-1.5 border border-slate-100">
+                        <p class="flex items-center gap-2"><span class="text-base">👀</span> <span>Observa el Barrufet (toca la foto per ampliar-la).</span></p>
+                        <p class="flex items-center gap-2"><span class="text-base">👆</span> <span>Tria el mestre o mestra correcte entre 6 opcions.</span></p>
+                        <p class="flex items-center gap-2"><span class="text-base">🏆</span> <span>Descobreix la teua puntuació en acabar les 34 rondes!</span></p>
+                    </div>
+
+                    <button id="startRealGameBtn" type="button" class="game-btn w-full py-4 px-6 rounded-2xl font-display text-xl sm:text-2xl font-bold text-white bg-gradient-to-b from-emerald-400 to-emerald-600 border-b-4 border-emerald-800 shadow-lg">
+                        Començar a jugar! 🚀
+                    </button>
+                </div>
+
+                <!-- Estat 3: Carpeta imatges/ no detectada (previsualització sense fotos) -->
+                <div id="fallbackState" class="hidden mt-6 space-y-4 animate-pop-in">
+                    <div class="rounded-2xl bg-amber-50 border-2 border-amber-200 p-4 text-left text-xs sm:text-sm text-amber-950 space-y-2">
+                        <div class="flex items-center gap-2 font-bold text-amber-900">
+                            <span>📂</span>
+                            <span>Llest per a GitHub Pages!</span>
+                        </div>
+                        <p class="leading-relaxed">
+                            No s'ha trobat la carpeta <code class="px-1.5 py-0.5 rounded bg-amber-100 font-semibold">imatges/</code> al costat d'aquest fitxer HTML. Quan puges aquest fitxer (anomenat <code class="px-1.5 py-0.5 rounded bg-amber-100 font-semibold">index.html</code>) juntament amb la carpeta <code class="px-1.5 py-0.5 rounded bg-amber-100 font-semibold">imatges/</code> (fotos 1 a 68) a GitHub Pages, el joc carregarà automàticament els 34 mestres.
+                        </p>
+                    </div>
+
+                    <button id="startDemoBtn" type="button" class="game-btn w-full py-4 px-6 rounded-2xl font-display text-lg sm:text-xl font-bold text-white bg-gradient-to-b from-smurf-light to-smurf-dark border-b-4 border-smurf-deep shadow-lg">
+                        🧪 Provar en mode demostració (10 rondes)
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- ========================================================== -->
+        <!-- PANTALLA 2: JOC ACTIU (MÒBIL FIRST + ESCRIPTORI 2 COLUMNES) -->
+        <!-- ========================================================== -->
+        <section id="gameScreen" class="hidden flex-1 flex flex-col">
+
+            <!-- Barra superior compacta -->
+            <header class="sticky top-0 z-30 bg-white/92 backdrop-blur-md border-b border-smurf/15 shadow-xs">
+                <div class="max-w-6xl mx-auto px-3 sm:px-5 py-2 sm:py-2.5">
+                    <div class="flex items-center justify-between gap-2">
+                        <!-- Progrés -->
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg sm:text-xl" aria-hidden="true">🍄</span>
+                            <span id="progressText" class="font-display font-bold text-smurf-dark text-sm sm:text-lg whitespace-nowrap">
+                                Barrufet 1 / 34
+                            </span>
+                        </div>
+
+                        <!-- Puntuació i so -->
+                        <div class="flex items-center gap-2">
+                            <div id="scoreBadge" class="px-2.5 sm:px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs sm:text-sm border border-emerald-200 whitespace-nowrap">
+                                Punts: <span id="scoreValue">0</span>
+                            </div>
+
+                            <button id="muteBtn" type="button" aria-label="Activar o silenciar so" title="Activar / Silenciar so" class="game-btn p-1.5 sm:p-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-smurf-dark border border-sky-200">
+                                <!-- So activat -->
+                                <svg id="soundOnIcon" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H3v6h3l5 4V5z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
+                                </svg>
+                                <!-- So silenciat -->
+                                <svg id="soundOffIcon" class="w-4 h-4 sm:w-5 sm:h-5 hidden text-rose-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H3v6h3l5 4V5z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M23 9l-6 6M17 9l6 6"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Barra visual de progrés -->
+                    <div class="mt-1.5 w-full h-2 bg-sky-100 rounded-full overflow-hidden">
+                        <div id="progressBar" class="h-full bg-gradient-to-r from-smurf-light via-smurf to-smurf-dark rounded-full transition-all duration-400 ease-out" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Contingut principal responsive -->
+            <main class="flex-1 w-full max-w-6xl mx-auto px-2.5 sm:px-5 py-2.5 sm:py-5 flex flex-col justify-center">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-5 items-stretch">
+
+                    <!-- COLUMNA ESQUERRA (Mòbil: compacta dalt | Escriptori: 38-40% esquerra) -->
+                    <div class="md:col-span-5 flex flex-col">
+                        <div class="flex-1 bg-white rounded-2xl sm:rounded-3xl shadow-lg border-2 sm:border-4 border-smurf/20 p-2.5 sm:p-4 flex flex-col">
+                            <div class="flex items-center justify-between mb-1.5 sm:mb-2.5 px-1">
+                                <span class="inline-block px-3 py-0.5 rounded-full bg-smurf text-white font-display text-xs sm:text-base font-semibold shadow-xs">
+                                    Qui és aquest Barrufet?
+                                </span>
+                                <span class="text-[11px] sm:text-xs text-slate-400 font-medium">
+                                    Toca per ampliar
+                                </span>
+                            </div>
+
+                            <!-- Contenidor clicable del Barrufet amb lupa -->
+                            <button id="smurfZoomTrigger" type="button" aria-label="Ampliar imatge del Barrufet" class="group relative flex-1 w-full h-[26dvh] min-h-[155px] max-h-[240px] md:h-auto md:min-h-[380px] md:max-h-[540px] rounded-xl sm:rounded-2xl bg-gradient-to-b from-sky-50 to-slate-50 border border-sky-100 flex items-center justify-center p-1.5 sm:p-2 overflow-hidden cursor-zoom-in focus:outline-none focus:ring-4 focus:ring-smurf/30">
+                                <img id="smurfImage" src="" alt="Barrufet a endevinar" class="w-full h-full object-contain rounded-lg select-none transition-transform duration-200 group-hover:scale-[1.02]">
+
+                                <!-- Icona de lupa a la cantonada inferior dreta -->
+                                <span class="absolute bottom-2 right-2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/90 text-smurf-dark shadow-md border border-sky-200 flex items-center justify-center group-hover:bg-smurf group-hover:text-white transition-colors">
+                                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                                        <circle cx="11" cy="11" r="7"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 20l-3.5-3.5M11 8v6M8 11h6"/>
+                                    </svg>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- COLUMNA DRETA (Mòbil: graella 3x2 compacta | Escriptori: 60% dreta) -->
+                    <div class="md:col-span-7 flex flex-col justify-between gap-2.5 sm:gap-4">
+                        <div class="bg-white/90 backdrop-blur-xs rounded-2xl sm:rounded-3xl shadow-lg border-2 sm:border-4 border-white p-2.5 sm:p-4 flex-1 flex flex-col">
+                            <div class="hidden md:flex items-center justify-between mb-2.5 px-1">
+                                <h2 class="font-display text-lg font-bold text-slate-700">
+                                    Tria el mestre o mestra correcte:
+                                </h2>
+                                <span class="text-xs text-slate-400 font-medium">6 opcions</span>
+                            </div>
+
+                            <!-- Graella: 2 columnes en pantalles molt estretes (<360px), 3x2 en mòbils estàndard i escriptori -->
+                            <div id="optionsGrid" class="grid grid-cols-2 min-[360px]:grid-cols-3 gap-2 sm:gap-3.5 flex-1">
+                                <!-- 6 targetes generades dinàmicament -->
+                            </div>
+                        </div>
+
+                        <!-- Barra de feedback i botó Següent -->
+                        <div id="feedbackBar" class="min-h-[60px] sm:min-h-[72px] rounded-2xl bg-white/95 border-2 border-sky-100 shadow-md px-3.5 sm:px-5 py-2.5 flex items-center justify-between gap-2.5 transition-all">
+                            <div id="feedbackMessage" class="font-display text-sm sm:text-xl font-semibold text-slate-500 leading-tight">
+                                Toca una foto per respondre
+                            </div>
+
+                            <button id="nextRoundBtn" type="button" class="hidden game-btn px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl font-display text-sm sm:text-lg font-bold text-white bg-gradient-to-b from-smurf to-smurf-dark border-b-4 border-smurf-deep shadow-md whitespace-nowrap shrink-0">
+                                Següent barrufet →
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </main>
+        </section>
+
+        <!-- ========================================================== -->
+        <!-- PANTALLA 3: RESULTATS FINALS                               -->
+        <!-- ========================================================== -->
+        <section id="resultsScreen" class="hidden flex-1 flex items-center justify-center p-4 sm:p-6">
+            <div class="w-full max-w-md bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl border-4 border-smurf/25 p-6 sm:p-9 text-center animate-pop-in">
+                <div id="resultEmoji" class="text-6xl sm:text-7xl mb-2">🏆</div>
+                <p class="text-xs sm:text-sm font-bold uppercase tracking-wider text-smurf">Partida completada!</p>
+                <h2 id="resultRankTitle" class="font-display text-3xl sm:text-4xl font-bold text-smurf-dark mt-1">
+                    Papà Barrufet
+                </h2>
+                <p id="resultSubtitle" class="mt-2 text-slate-600 text-sm sm:text-base">
+                    Impressionant! Coneixes tots els mestres fins i tot de color blau!
+                </p>
+
+                <!-- Marcador final -->
+                <div class="my-6 bg-gradient-to-br from-sky-50 to-blue-50 rounded-3xl p-5 border-2 border-sky-200 shadow-inner">
+                    <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Puntuació final</div>
+                    <div id="finalScoreText" class="font-display text-5xl sm:text-6xl font-bold text-smurf-dark my-1">
+                        0 / 34
+                    </div>
+                    <div class="inline-flex items-center gap-1.5 mt-1.5 px-4 py-1 rounded-full bg-white text-smurf-deep font-bold text-base sm:text-lg shadow-xs border border-sky-100">
+                        <span id="finalPercentText">0%</span> d'encerts
+                    </div>
+                </div>
+
+                <button id="playAgainBtn" type="button" class="game-btn w-full py-4 px-6 rounded-2xl font-display text-xl font-bold text-white bg-gradient-to-b from-emerald-400 to-emerald-600 border-b-4 border-emerald-800 shadow-lg">
+                    🔄 Tornar a jugar
+                </button>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- LIGHTBOX D'AMPLIACIÓ NOMÉS PER A LA IMATGE DEL BARRUFET    -->
+    <!-- ========================================================== -->
+    <div id="zoomModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4 cursor-zoom-out" role="dialog" aria-modal="true" aria-label="Imatge ampliada del Barrufet">
+        <button id="closeZoomBtn" type="button" aria-label="Tancar ampliació" class="game-btn absolute top-4 right-4 w-11 h-11 rounded-full bg-white text-slate-800 shadow-xl flex items-center justify-center font-bold text-xl z-10">
+            ✕
+        </button>
+        <div class="relative max-w-2xl w-full max-h-[85dvh] flex flex-col items-center justify-center animate-pop-in">
+            <img id="zoomedSmurfImg" src="" alt="Barrufet ampliat" class="max-w-full max-h-[80dvh] object-contain rounded-2xl bg-white/95 p-2 shadow-2xl">
+            <p class="mt-3 text-white/80 text-xs sm:text-sm font-medium">Toca fora de la foto per tancar</p>
+        </div>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- LÒGICA DEL JOC (JAVASCRIPT)                                -->
+    <!-- ========================================================== -->
+    <script>
+        (() => {
+            'use strict';
+
+            // Nombre total de parelles reals (1↔2, 3↔4, ..., 67↔68)
+            const TOTAL_REAL_PAIRS = 34;
+
+            // Estat global del joc
+            const state = {
+                pairs: [],           // Llista completa de parelles: { id, smurfUrl, teacherUrl }
+                rounds: [],          // Rondes precalculades: { pair, options: [6 pairs] }
+                currentIndex: 0,     // Índex de ronda actual
+                score: 0,            // Encerts acumulats
+                roundLocked: false,  // Impedeix clicar més d'una opció per ronda
+                isMuted: false,      // Control d'àudio
+                imageExt: 'jpg',     // S'autodetecta (.png o .jpg) en iniciar
+                demoBlobUrls: []     // URLs SVG per al mode demostració
+            };
+
+            // Referències DOM
+            const startScreen = document.getElementById('startScreen');
+            const gameScreen = document.getElementById('gameScreen');
+            const resultsScreen = document.getElementById('resultsScreen');
+
+            const checkingState = document.getElementById('checkingState');
+            const readyState = document.getElementById('readyState');
+            const fallbackState = document.getElementById('fallbackState');
+            const startRealGameBtn = document.getElementById('startRealGameBtn');
+            const startDemoBtn = document.getElementById('startDemoBtn');
+
+            const progressText = document.getElementById('progressText');
+            const progressBar = document.getElementById('progressBar');
+            const scoreBadge = document.getElementById('scoreBadge');
+            const scoreValue = document.getElementById('scoreValue');
+            const muteBtn = document.getElementById('muteBtn');
+            const soundOnIcon = document.getElementById('soundOnIcon');
+            const soundOffIcon = document.getElementById('soundOffIcon');
+
+            const smurfZoomTrigger = document.getElementById('smurfZoomTrigger');
+            const smurfImage = document.getElementById('smurfImage');
+            const optionsGrid = document.getElementById('optionsGrid');
+            const feedbackBar = document.getElementById('feedbackBar');
+            const feedbackMessage = document.getElementById('feedbackMessage');
+            const nextRoundBtn = document.getElementById('nextRoundBtn');
+
+            const zoomModal = document.getElementById('zoomModal');
+            const zoomedSmurfImg = document.getElementById('zoomedSmurfImg');
+            const closeZoomBtn = document.getElementById('closeZoomBtn');
+
+            const resultEmoji = document.getElementById('resultEmoji');
+            const resultRankTitle = document.getElementById('resultRankTitle');
+            const resultSubtitle = document.getElementById('resultSubtitle');
+            const finalScoreText = document.getElementById('finalScoreText');
+            const finalPercentText = document.getElementById('finalPercentText');
+            const playAgainBtn = document.getElementById('playAgainBtn');
+
+            // ==========================================
+            // MOTOR D'ÀUDIO SUBTIL (WEB AUDIO API)
+            // ==========================================
+            let audioCtx = null;
+
+            function ensureAudioContext() {
+                try {
+                    if (!audioCtx) {
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                        if (AudioCtx) audioCtx = new AudioCtx();
+                    }
+                    if (audioCtx && audioCtx.state === 'suspended') {
+                        audioCtx.resume();
+                    }
+                } catch (e) {
+                    console.warn('Àudio no disponible:', e);
+                }
+                return audioCtx;
+            }
+
+            // Campaneta alegre en encertar
+            function playSuccessChime() {
+                if (state.isMuted) return;
+                const ctx = ensureAudioContext();
+                if (!ctx) return;
+                try {
+                    const now = ctx.currentTime;
+                    const freqs = [523.25, 659.25, 783.99, 1046.5];
+                    freqs.forEach((f, i) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(f, now + i * 0.065);
+                        gain.gain.setValueAtTime(0.001, now + i * 0.065);
+                        gain.gain.exponentialRampToValueAtTime(0.15, now + i * 0.065 + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.065 + 0.24);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + i * 0.065);
+                        osc.stop(now + i * 0.065 + 0.26);
+                    });
+                } catch (e) {}
+            }
+
+            // Brunzit suau en fallar
+            function playGentleBuzz() {
+                if (state.isMuted) return;
+                const ctx = ensureAudioContext();
+                if (!ctx) return;
+                try {
+                    const now = ctx.currentTime;
+                    const notes = [260, 195];
+                    notes.forEach((f, i) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(f, now + i * 0.12);
+                        gain.gain.setValueAtTime(0.001, now + i * 0.12);
+                        gain.gain.exponentialRampToValueAtTime(0.14, now + i * 0.12 + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.22);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + i * 0.12);
+                        osc.stop(now + i * 0.12 + 0.24);
+                    });
+                } catch (e) {}
+            }
+
+            // Fanfàrria final
+            function playFinalFanfare() {
+                if (state.isMuted) return;
+                const ctx = ensureAudioContext();
+                if (!ctx) return;
+                try {
+                    const now = ctx.currentTime;
+                    const seq = [
+                        { f: 523.25, t: 0, d: 0.12 },
+                        { f: 659.25, t: 0.12, d: 0.12 },
+                        { f: 783.99, t: 0.24, d: 0.12 },
+                        { f: 1046.5, t: 0.38, d: 0.42 }
+                    ];
+                    seq.forEach(n => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(n.f, now + n.t);
+                        gain.gain.setValueAtTime(0.001, now + n.t);
+                        gain.gain.exponentialRampToValueAtTime(0.16, now + n.t + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.d);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + n.t);
+                        osc.stop(now + n.t + n.d + 0.04);
+                    });
+                } catch (e) {}
+            }
+
+            // ==========================================
+            // DETECCIÓ AUTOMÀTICA DE LA CARPETA imatges/
+            // ==========================================
+            function checkImageExists(url) {
+                return new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => resolve(true);
+                    img.onerror = () => resolve(false);
+                    img.src = url;
+                });
+            }
+
+            /**
+             * Comprova automàticament si imatges/1.png o imatges/1.jpg són accessibles.
+             * Així funciona tant si les fotos estan en .png com en .jpg!
+             */
+            async function detectLocalFolder() {
+                try {
+                    const hasPng = await checkImageExists('imatges/1.png');
+                    if (hasPng) {
+                        state.imageExt = 'png';
+                        buildRealPairs('png');
+                        checkingState.classList.add('hidden');
+                        readyState.classList.remove('hidden');
+                        return;
+                    }
+
+                    const hasJpg = await checkImageExists('imatges/1.jpg');
+                    if (hasJpg) {
+                        state.imageExt = 'jpg';
+                        buildRealPairs('jpg');
+                        checkingState.classList.add('hidden');
+                        readyState.classList.remove('hidden');
+                        return;
+                    }
+                } catch (err) {
+                    console.warn('Error comprovant imatges:', err);
+                }
+
+                // Cap imatge trobada: mostrem avís de GitHub Pages + botó demostració
+                checkingState.classList.add('hidden');
+                fallbackState.classList.remove('hidden');
+            }
+
+            function buildRealPairs(ext) {
+                const pairs = [];
+                for (let i = 0; i < TOTAL_REAL_PAIRS; i++) {
+                    const odd = i * 2 + 1;   // 1, 3, 5, ..., 67 (Barrufet)
+                    const even = odd + 1;    // 2, 4, 6, ..., 68 (Mestre normal)
+                    pairs.push({
+                        id: odd,
+                        smurfUrl: `imatges/${odd}.${ext}`,
+                        teacherUrl: `imatges/${even}.${ext}`
+                    });
+                }
+                state.pairs = pairs;
+            }
+
+            // ==========================================
+            // MODE DEMOSTRACIÓ (10 RONDES AMB AVATARS SVG)
+            // ==========================================
+            function createSvgBlobUrl(svgString) {
+                const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                state.demoBlobUrls.push(url);
+                return url;
+            }
+
+            function buildDemoPairs() {
+                state.demoBlobUrls.forEach(u => URL.revokeObjectURL(u));
+                state.demoBlobUrls = [];
+
+                const demoProfiles = [
+                    { num: 1,  hair: '#F59E0B', shirt: '#3B82F6', glasses: true,  beard: false, name: 'Mestra Anna' },
+                    { num: 3,  hair: '#451A03', shirt: '#10B981', glasses: false, beard: true,  name: 'Mestre Marc' },
+                    { num: 5,  hair: '#DC2626', shirt: '#8B5CF6', glasses: true,  beard: false, name: 'Mestra Laura' },
+                    { num: 7,  hair: '#1E293B', shirt: '#F97316', glasses: false, beard: false, name: 'Mestre Pau' },
+                    { num: 9,  hair: '#D97706', shirt: '#EC4899', glasses: false, beard: false, name: 'Mestra Clara' },
+                    { num: 11, hair: '#64748B', shirt: '#06B6D4', glasses: true,  beard: true,  name: 'Mestre Joan' },
+                    { num: 13, hair: '#78350F', shirt: '#EAB308', glasses: false, beard: false, name: 'Mestra Núria' },
+                    { num: 15, hair: '#0F172A', shirt: '#6366F1', glasses: true,  beard: false, name: 'Mestre David' },
+                    { num: 17, hair: '#B45309', shirt: '#14B8A6', glasses: false, beard: false, name: 'Mestra Sara' },
+                    { num: 19, hair: '#94A3B8', shirt: '#EF4444', glasses: false, beard: true,  name: 'Mestre Vicent' }
+                ];
+
+                state.pairs = demoProfiles.map(p => {
+                    const glasses = p.glasses
+                        ? `<g stroke="#1E293B" stroke-width="4" fill="rgba(255,255,255,0.22)">
+                               <circle cx="122" cy="146" r="18"/>
+                               <circle cx="178" cy="146" r="18"/>
+                               <line x1="140" y1="146" x2="160" y2="146"/>
+                           </g>`
+                        : '';
+
+                    const beard = p.beard
+                        ? `<path d="M108 168 Q150 220 192 168 Q186 208 150 212 Q114 208 108 168 Z" fill="${p.hair}" opacity="0.92"/>`
+                        : '';
+
+                    const smurfSvg = `
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 360">
+                            <rect width="300" height="360" rx="22" fill="#E0F2FE"/>
+                            <path d="M95 250 Q150 226 205 250 L215 335 H85 Z" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="3"/>
+                            <ellipse cx="150" cy="145" rx="68" ry="62" fill="${p.hair}"/>
+                            <circle cx="150" cy="154" r="54" fill="#0088FF"/>
+                            <path d="M88 118 C88 60 120 26 172 28 C206 30 224 55 204 78 C192 92 178 86 184 102 C190 114 212 115 212 118 Z" fill="#FFFFFF" stroke="#0062CC" stroke-width="4" stroke-linejoin="round"/>
+                            <circle cx="126" cy="146" r="10" fill="#FFFFFF"/>
+                            <circle cx="174" cy="146" r="10" fill="#FFFFFF"/>
+                            <circle cx="128" cy="146" r="5" fill="#0F172A"/>
+                            <circle cx="172" cy="146" r="5" fill="#0F172A"/>
+                            <ellipse cx="150" cy="160" rx="11" ry="8" fill="#0062CC"/>
+                            ${beard}
+                            <path d="M130 176 Q150 192 170 176" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" fill="none"/>
+                            ${glasses}
+                            <rect x="65" y="308" width="170" height="32" rx="16" fill="#0062CC"/>
+                            <text x="150" y="329" font-family="sans-serif" font-size="15" font-weight="bold" fill="#FFFFFF" text-anchor="middle">Barrufet #${p.num}</text>
+                        </svg>`;
+
+                    const teacherSvg = `
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 360">
+                            <rect width="300" height="360" rx="22" fill="#F1F5F9"/>
+                            <path d="M85 248 Q150 222 215 248 L225 335 H75 Z" fill="${p.shirt}"/>
+                            <ellipse cx="150" cy="136" rx="68" ry="66" fill="${p.hair}"/>
+                            <circle cx="150" cy="154" r="54" fill="#FCD5B5"/>
+                            <path d="M98 134 Q150 92 202 134 Q175 114 150 118 Q125 114 98 134 Z" fill="${p.hair}"/>
+                            <circle cx="126" cy="146" r="7" fill="#1E293B"/>
+                            <circle cx="174" cy="146" r="7" fill="#1E293B"/>
+                            <path d="M150 148 L146 164 L154 164" stroke="#D49A74" stroke-width="3" fill="none" stroke-linecap="round"/>
+                            ${beard}
+                            <path d="M130 176 Q150 192 170 176" stroke="#9A3412" stroke-width="4" stroke-linecap="round" fill="none"/>
+                            ${glasses}
+                            <rect x="45" y="308" width="210" height="32" rx="16" fill="#1E293B"/>
+                            <text x="150" y="329" font-family="sans-serif" font-size="15" font-weight="bold" fill="#FFFFFF" text-anchor="middle">${p.name}</text>
+                        </svg>`;
+
+                    return {
+                        id: p.num,
+                        smurfUrl: createSvgBlobUrl(smurfSvg),
+                        teacherUrl: createSvgBlobUrl(teacherSvg)
+                    };
+                });
+            }
+
+            // ==========================================
+            // UTILITATS I PRECÀRREGA D'IMATGES
+            // ==========================================
+            function shuffle(arr) {
+                const copy = [...arr];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [copy[i], copy[j]] = [copy[j], copy[i]];
+                }
+                return copy;
+            }
+
+            function showScreen(name) {
+                startScreen.classList.add('hidden');
+                gameScreen.classList.add('hidden');
+                resultsScreen.classList.add('hidden');
+                closeZoom();
+                stopConfetti();
+
+                if (name === 'start') startScreen.classList.remove('hidden');
+                if (name === 'game') gameScreen.classList.remove('hidden');
+                if (name === 'results') resultsScreen.classList.remove('hidden');
+            }
+
+            // Precarrega en segon pla les 7 fotos (1 barrufet + 6 mestres) de la ronda indicada
+            function preloadRoundImages(roundIdx) {
+                if (roundIdx < 0 || roundIdx >= state.rounds.length) return;
+                const round = state.rounds[roundIdx];
+                const urls = [round.pair.smurfUrl, ...round.options.map(o => o.teacherUrl)];
+                urls.forEach(url => {
+                    const img = new Image();
+                    img.src = url;
+                });
+            }
+
+            // ==========================================
+            // FLUX DEL JOC
+            // ==========================================
+            function startGame() {
+                if (state.pairs.length < 2) return;
+                ensureAudioContext();
+
+                state.score = 0;
+                state.currentIndex = 0;
+                state.roundLocked = false;
+
+                // Mesclem l'ordre dels barrufets i precalculem les 6 opcions de cada ronda
+                const shuffledPairs = shuffle(state.pairs);
+                state.rounds = shuffledPairs.map(pair => {
+                    const others = state.pairs.filter(p => p.id !== pair.id);
+                    const distractors = shuffle(others).slice(0, 5);
+                    const options = shuffle([pair, ...distractors]);
+                    return { pair, options };
+                });
+
+                scoreValue.textContent = '0';
+                showScreen('game');
+                renderRound();
+            }
+
+            function renderRound() {
+                state.roundLocked = false;
+                const total = state.rounds.length;
+                const currentRound = state.rounds[state.currentIndex];
+                const { pair, options } = currentRound;
+
+                // Barra superior
+                progressText.textContent = `Barrufet ${state.currentIndex + 1} / ${total}`;
+                progressBar.style.width = `${(state.currentIndex / total) * 100}%`;
+
+                // Foto del barrufet
+                smurfImage.src = pair.smurfUrl;
+                smurfImage.classList.remove('animate-pop-in');
+                void smurfImage.offsetWidth;
+                smurfImage.classList.add('animate-pop-in');
+
+                // Graella de les 6 opcions
+                optionsGrid.innerHTML = '';
+                options.forEach((optPair, idx) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'teacher-card relative rounded-xl sm:rounded-2xl bg-slate-50 border-2 sm:border-3 border-slate-200 hover:border-smurf p-1 sm:p-1.5 flex items-center justify-center overflow-hidden shadow-xs aspect-[3/3.4] sm:aspect-[4/4.3] cursor-pointer focus:outline-none focus:ring-4 focus:ring-smurf/35';
+                    btn.setAttribute('aria-label', `Opció de mestre ${idx + 1}`);
+
+                    const img = document.createElement('img');
+                    img.src = optPair.teacherUrl;
+                    img.alt = `Mestre opció ${idx + 1}`;
+                    img.className = 'w-full h-full object-contain rounded-lg pointer-events-none select-none';
+
+                    const badge = document.createElement('span');
+                    badge.className = 'result-badge hidden absolute top-1.5 right-1.5 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-base shadow-md border-2 border-white';
+
+                    btn.appendChild(img);
+                    btn.appendChild(badge);
+                    btn.addEventListener('click', () => handleSelection(btn, optPair.id === pair.id));
+                    optionsGrid.appendChild(btn);
+                });
+
+                // Reinicia la barra inferior de feedback
+                feedbackBar.className = 'min-h-[60px] sm:min-h-[72px] rounded-2xl bg-white/95 border-2 border-sky-100 shadow-md px-3.5 sm:px-5 py-2.5 flex items-center justify-between gap-2.5 transition-all';
+                feedbackMessage.className = 'font-display text-sm sm:text-xl font-semibold text-slate-500 leading-tight';
+                feedbackMessage.textContent = 'Toca una foto per respondre';
+                nextRoundBtn.classList.add('hidden');
+
+                // Precarrega la ronda següent en segon pla perquè siga instantània en mòbil
+                preloadRoundImages(state.currentIndex + 1);
+            }
+
+            /**
+             * Gestió del clic sobre una opció.
+             * REGLA ESTRICTA: Si falla, NO s'indica ni es ressalta quina era la resposta correcta.
+             */
+            function handleSelection(clickedBtn, isCorrect) {
+                if (state.roundLocked) return;
+                state.roundLocked = true;
+
+                const allCards = optionsGrid.querySelectorAll('.teacher-card');
+                const badge = clickedBtn.querySelector('.result-badge');
+
+                allCards.forEach(card => {
+                    card.classList.add('locked', 'cursor-default');
+                    card.disabled = true;
+                    if (card !== clickedBtn) {
+                        card.classList.add('opacity-55');
+                    }
+                });
+
+                if (isCorrect) {
+                    state.score += 1;
+                    scoreValue.textContent = String(state.score);
+                    scoreBadge.classList.remove('animate-score-pop');
+                    void scoreBadge.offsetWidth;
+                    scoreBadge.classList.add('animate-score-pop');
+
+                    clickedBtn.classList.remove('border-slate-200', 'hover:border-smurf', 'bg-slate-50');
+                    clickedBtn.classList.add('border-emerald-500', 'bg-emerald-50', 'ring-3', 'ring-emerald-300');
+
+                    badge.classList.remove('hidden');
+                    badge.classList.add('bg-emerald-500');
+                    badge.textContent = '✓';
+
+                    feedbackBar.classList.remove('border-sky-100', 'bg-white/95');
+                    feedbackBar.classList.add('border-emerald-300', 'bg-emerald-50');
+                    feedbackMessage.className = 'font-display text-base sm:text-xl font-bold text-emerald-700 leading-tight';
+                    feedbackMessage.textContent = 'Encert! +1 punt 🎉';
+
+                    playSuccessChime();
+                } else {
+                    // Només marquem en roig la targeta triada, sense revelar la correcta
+                    clickedBtn.classList.remove('border-slate-200', 'hover:border-smurf', 'bg-slate-50');
+                    clickedBtn.classList.add('border-rose-500', 'bg-rose-50', 'ring-3', 'ring-rose-300', 'animate-shake');
+
+                    badge.classList.remove('hidden');
+                    badge.classList.add('bg-rose-500');
+                    badge.textContent = '✕';
+
+                    feedbackBar.classList.remove('border-sky-100', 'bg-white/95');
+                    feedbackBar.classList.add('border-rose-300', 'bg-rose-50');
+                    feedbackMessage.className = 'font-display text-base sm:text-xl font-bold text-rose-700 leading-tight';
+                    feedbackMessage.textContent = 'Ups! No és aquest mestre/a ❌';
+
+                    playGentleBuzz();
+                }
+
+                // Actualitza la barra de progrés
+                const total = state.rounds.length;
+                progressBar.style.width = `${((state.currentIndex + 1) / total) * 100}%`;
+
+                // Mostra el botó d'avançar
+                const isLastRound = state.currentIndex === total - 1;
+                nextRoundBtn.textContent = isLastRound ? 'Veure puntuació 🏆' : 'Següent barrufet →';
+                nextRoundBtn.classList.remove('hidden');
+            }
+
+            function nextRound() {
+                if (!state.roundLocked) return;
+                if (state.currentIndex < state.rounds.length - 1) {
+                    state.currentIndex += 1;
+                    renderRound();
+                } else {
+                    showResults();
+                }
+            }
+
+            function showResults() {
+                const total = state.rounds.length;
+                const percent = total > 0 ? Math.round((state.score / total) * 100) : 0;
+
+                finalScoreText.textContent = `${state.score} / ${total}`;
+                finalPercentText.textContent = `${percent}%`;
+
+                let emoji = '👑';
+                let rank = 'Papà Barrufet';
+                let sub = 'Brutal! Tens vista de falcó, no se t\'escapa ni un sol mestre del poblat!';
+
+                if (percent >= 85) {
+                    emoji = '👑';
+                    rank = 'Papà Barrufet';
+                    sub = 'Brutal! Coneixes tots els mestres fins i tot transformats en Barrufets!';
+                } else if (percent >= 65) {
+                    emoji = '🤓';
+                    rank = 'Barrufet Filòsof';
+                    sub = 'Molt bona partida! Has demostrat una gran capacitat d\'observació.';
+                } else if (percent >= 40) {
+                    emoji = '👀';
+                    rank = 'Barrufet Espavilat';
+                    sub = 'No està gens malament! Alguns mestres estaven molt ben camuflats.';
+                } else {
+                    emoji = '😅';
+                    rank = 'Barrufet Despistat';
+                    sub = 'Ai, quina confusió al poblat! Torna-ho a intentar per millorar la puntuació!';
+                }
+
+                resultEmoji.textContent = emoji;
+                resultRankTitle.textContent = rank;
+                resultSubtitle.textContent = sub;
+
+                showScreen('results');
+                playFinalFanfare();
+                startConfetti();
+            }
+
+            // ==========================================
+            // LIGHTBOX D'AMPLIACIÓ DEL BARRUFET
+            // ==========================================
+            function openZoom() {
+                if (!smurfImage.src) return;
+                zoomedSmurfImg.src = smurfImage.src;
+                zoomModal.classList.remove('hidden');
+            }
+
+            function closeZoom() {
+                zoomModal.classList.add('hidden');
+            }
+
+            // ==========================================
+            // CONFETI ANIMAT EN CANVAS RESPONSIVE
+            // ==========================================
+            const confettiCanvas = document.getElementById('confettiCanvas');
+            const confettiCtx = confettiCanvas.getContext('2d');
+            let confettiParticles = [];
+            let confettiRaf = null;
+
+            function resizeConfetti() {
+                confettiCanvas.width = window.innerWidth;
+                confettiCanvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resizeConfetti);
+
+            function startConfetti() {
+                resizeConfetti();
+                confettiCanvas.style.display = 'block';
+                const palette = ['#0088FF', '#38BDF8', '#FFFFFF', '#FACC15', '#EF4444', '#10B981'];
+                confettiParticles = [];
+
+                for (let i = 0; i < 110; i++) {
+                    confettiParticles.push({
+                        x: Math.random() * confettiCanvas.width,
+                        y: Math.random() * -confettiCanvas.height,
+                        w: 6 + Math.random() * 7,
+                        h: 4 + Math.random() * 6,
+                        color: palette[Math.floor(Math.random() * palette.length)],
+                        vy: 2 + Math.random() * 3.2,
+                        vx: (Math.random() - 0.5) * 2,
+                        angle: Math.random() * Math.PI * 2,
+                        spin: (Math.random() - 0.5) * 0.14
+                    });
+                }
+
+                function loop() {
+                    confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+                    confettiParticles.forEach(p => {
+                        p.y += p.vy;
+                        p.x += p.vx;
+                        p.angle += p.spin;
+                        if (p.y > confettiCanvas.height + 20) {
+                            p.y = -20;
+                            p.x = Math.random() * confettiCanvas.width;
+                        }
+                        confettiCtx.save();
+                        confettiCtx.translate(p.x, p.y);
+                        confettiCtx.rotate(p.angle);
+                        confettiCtx.fillStyle = p.color;
+                        confettiCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                        confettiCtx.restore();
+                    });
+                    confettiRaf = requestAnimationFrame(loop);
+                }
+
+                if (confettiRaf) cancelAnimationFrame(confettiRaf);
+                loop();
+            }
+
+            function stopConfetti() {
+                if (confettiRaf) {
+                    cancelAnimationFrame(confettiRaf);
+                    confettiRaf = null;
+                }
+                confettiCanvas.style.display = 'none';
+                confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            }
+
+            // ==========================================
+            // ESDEVENIMENTS
+            // ==========================================
+            startRealGameBtn.addEventListener('click', startGame);
+
+            startDemoBtn.addEventListener('click', () => {
+                buildDemoPairs();
+                startGame();
+            });
+
+            nextRoundBtn.addEventListener('click', nextRound);
+            playAgainBtn.addEventListener('click', startGame);
+
+            // Ampliació del Barrufet
+            smurfZoomTrigger.addEventListener('click', openZoom);
+            closeZoomBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeZoom();
+            });
+            zoomModal.addEventListener('click', closeZoom);
+
+            // Silenci d'àudio
+            muteBtn.addEventListener('click', () => {
+                state.isMuted = !state.isMuted;
+                soundOnIcon.classList.toggle('hidden', state.isMuted);
+                soundOffIcon.classList.toggle('hidden', !state.isMuted);
+            });
+
+            // Teclat (Escape tanca lupa, Enter/Espai avança de ronda)
+            document.addEventListener('keydown', (e) => {
+                if (!zoomModal.classList.contains('hidden')) {
+                    if (e.key === 'Escape') closeZoom();
+                    return;
+                }
+                if (!gameScreen.classList.contains('hidden') && state.roundLocked) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        nextRound();
+                    }
+                }
+            });
+
+            // Inici en carregar la pàgina
+            window.onload = function () {
+                resizeConfetti();
+                detectLocalFolder();
+            };
+        })();
+    </script>
+</body>
+</html>
